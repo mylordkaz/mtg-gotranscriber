@@ -37,3 +37,17 @@ func (ap *AudioProcessor) ReduceNoise(input []byte) []byte {
 	}
 	return output
 }
+
+func (ap *AudioProcessor) SplitChannels(input []byte) ([]byte, []byte) {
+	inputLength := len(input)
+	leftChannel := make([]byte, inputLength/2)
+	rightChannel := make([]byte, inputLength/2)
+
+	for i := 0; i < inputLength; i += 4 {
+		leftChannel[i/2] = input[i]
+		leftChannel[i/2+1] = input[i+1]
+		rightChannel[i/2] = input[i+2]
+		rightChannel[i/2+1] = input[i+3]
+	}
+	return leftChannel, rightChannel
+}
