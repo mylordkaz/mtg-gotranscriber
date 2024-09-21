@@ -65,3 +65,29 @@ func (ap *AudioProcessor) SplitChannels(input []byte) ([]byte, []byte) {
 
     return leftChannel, rightChannel
 }
+
+// not used at the moment 
+func (ap *AudioProcessor) LowPassFilter(input []byte) []byte {
+	output := make([]byte, len(input))
+	samplesPerChannel := len(input) / (2 * ap.numChannels)
+
+	// low-pass filter with smoothing factor
+	smoothingFactor := 0.9
+	var previousSample int16
+
+	for i := 0; i < samplesPerChannel; i++ {
+		for ch := 0; ch < ap.numChannels; ch++ {
+			idx := (i*ap.numChannels + ch) * 2
+			sample := int16(input[idx]) | (int16(input[idx+1]) << 8)
+
+			// Apply low-pass filter
+			filteredSample := int16(float64(previousSample)*smoothingFactor + float64(sample)*(1-smoothingFactor))
+			previousSample = filteredSample
+
+			// convert back to bytes
+			output[idx] = byte(filteredSample)
+			output[idx+1] = byte(filteredSample >> 8)
+		}
+	}
+	return output
+}
