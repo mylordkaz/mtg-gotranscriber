@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
@@ -30,17 +33,52 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	outputFile, err := os.Create("output.wav")
+	if err != nil {
+		fmt.Println("Error creating output file:", err)
+		return
+	}
+	defer outputFile.Close()
+
+	writeWAVHeader(outputFile, 44100, 2, 16)
+
+	var mu sync.Mutex
+	totalBytesWritten := 0
 	go func() {
 		for {
 			chunk, err := capture.ReadChunk(4096)
-			if err != nil {
-				fmt.Println("Error reading audio chunk:", err)
-				return
-			}
-			processedChunk := processor.ReduceNoise(chunk)
-			leftChan, rightChan := processor.SplitChannels(processedChunk)
+        	if err != nil {
+            	if err == io.EOF {
+					fmt.Println("End of audio stream reached")
+					return
+				}
+            	fmt.Println("Error reading audio chunk:", err)
+            	continue  // Try to read the next chunk instead of exiting
+        	}
+			fmt.Printf("Read chunk of size: %d bytes\n", len(chunk))
 
-			fmt.Printf("Processed chunk: Let channel: %d bytes, Right channel: %d bytes\n", len(leftChan), len(rightChan))
+        	if len(chunk) == 0 {
+            	fmt.Println("Received empty chunk, continuing...")
+            	continue
+        	}
+
+			processedChunk := processor.ReduceNoise(chunk)
+
+			// Check if processedChunk is empty
+			if len(processedChunk) == 0 {
+				fmt.Println("Processed chunk is empty, skipping")
+				continue
+			}
+			n, err := outputFile.Write(processedChunk)
+			if err != nil {
+				fmt.Println("Error writing to file:", err)
+				return
+        	}
+			mu.Lock()
+			totalBytesWritten += n
+			mu.Unlock()
+			fmt.Printf("Total bytes written to file: %d\n", totalBytesWritten)
+		
 		}
 	}()
 
@@ -53,7 +91,49 @@ func main() {
 		fmt.Println("Error stopping audio capture:", err)
 	}
 
-	// initialize speech recognition
+	mu.Lock()
+	err = updateWAVHeader(outputFile, totalBytesWritten)
+	mu.Unlock()
+if err != nil {
+    fmt.Println("Error updating WAV header:", err)
+}
+
+	
+}
+
+func writeWAVHeader(file *os.File, sampleRate, numChannels, bitsPerSample int) {
+    // RIFF chunk
+    file.WriteString("RIFF")
+    file.Write([]byte{0, 0, 0, 0}) // File size, to be filled later
+    file.WriteString("WAVE")
+
+    // fmt sub-chunk
+    file.WriteString("fmt ")
+    binary.Write(file, binary.LittleEndian, int32(16)) // Chunk size
+    binary.Write(file, binary.LittleEndian, int16(1)) // Audio format (PCM)
+    binary.Write(file, binary.LittleEndian, int16(numChannels))
+    binary.Write(file, binary.LittleEndian, int32(sampleRate))
+    binary.Write(file, binary.LittleEndian, int32(sampleRate*numChannels*bitsPerSample/8)) // Byte rate
+    binary.Write(file, binary.LittleEndian, int16(numChannels*bitsPerSample/8)) // Block align
+    binary.Write(file, binary.LittleEndian, int16(bitsPerSample))
+
+    // data sub-chunk
+    file.WriteString("data")
+    file.Write([]byte{0, 0, 0, 0}) // Data size, to be filled later
+}
+func updateWAVHeader(file *os.File, dataSize int) error {
+    // Update RIFF chunk size
+    file.Seek(4, 0)
+    binary.Write(file, binary.LittleEndian, int32(dataSize+36))
+
+    // Update data sub-chunk size
+    file.Seek(40, 0)
+    binary.Write(file, binary.LittleEndian, int32(dataSize))
+
+    return nil
+}
+
+// initialize speech recognition
 	// TODO: implement speech recognition
 
 	// transcription loop
@@ -64,4 +144,3 @@ func main() {
 		// output transcription, print to the console
 		// append each transcription chunk to a buffer
 		// when session ends, write entire buffer to a file
-}
