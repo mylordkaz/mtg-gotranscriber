@@ -53,7 +53,7 @@ func main() {
 					return
 				}
             	fmt.Println("Error reading audio chunk:", err)
-            	continue  // Try to read the next chunk instead of exiting
+            	continue 
         	}
 			fmt.Printf("Read chunk of size: %d bytes\n", len(chunk))
 
@@ -62,14 +62,15 @@ func main() {
             	continue
         	}
 
+			// Noise reduction is not in use right now.
 			processedChunk := processor.ReduceNoise(chunk)
 
-			// Check if processedChunk is empty
 			if len(processedChunk) == 0 {
 				fmt.Println("Processed chunk is empty, skipping")
 				continue
 			}
-			n, err := outputFile.Write(processedChunk)
+
+			n, err := outputFile.Write(chunk)
 			if err != nil {
 				fmt.Println("Error writing to file:", err)
 				return
