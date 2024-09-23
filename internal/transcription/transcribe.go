@@ -1,0 +1,6 @@
+package transcription
+
+
+func Transcribe() {
+	
+}
