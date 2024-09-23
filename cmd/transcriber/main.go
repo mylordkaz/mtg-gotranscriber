@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -23,8 +24,9 @@ func main() {
 
 	processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
 
+	modelPath := filepath.Join("internal", "transcription", "models", "ja-model")
 	// initialize transcriber
-	transcriber, err := transcription.NewTranscriber("path/to/model", 44100)
+	transcriber, err := transcription.NewTranscriber(modelPath, 44100)
 	if err != nil {
 		fmt.Println("Error creating transcriber:", err)
 		return
