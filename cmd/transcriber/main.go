@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
+	"github.com/mylordkaz/mtg-gotranscriber/internal/transcription"
 )
 
 func main() {
@@ -21,6 +22,14 @@ func main() {
 	}
 
 	processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
+
+	// initialize transcriber
+	transcriber, err := transcription.NewTranscriber("path/to/model", 44100)
+	if err != nil {
+		fmt.Println("Error creating transcriber:", err)
+		return
+	}
+	defer transcriber.Close()
 
 	err = capture.Start()
 	if err != nil {
@@ -55,12 +64,6 @@ func main() {
             	fmt.Println("Error reading audio chunk:", err)
             	continue 
         	}
-			fmt.Printf("Read chunk of size: %d bytes\n", len(chunk))
-
-        	if len(chunk) == 0 {
-            	fmt.Println("Received empty chunk, continuing...")
-            	continue
-        	}
 
 			// Noise reduction is not in use right now.
 			processedChunk := processor.ReduceNoise(chunk)
@@ -78,8 +81,12 @@ func main() {
 			mu.Lock()
 			totalBytesWritten += n
 			mu.Unlock()
-			fmt.Printf("Total bytes written to file: %d\n", totalBytesWritten)
-		
+			
+			// process audio for transcription
+			transcript := transcriber.ProcessAudio(chunk)
+			if transcript != "" {
+				fmt.Printf("Transcription: %s\n", transcript)
+			}
 		}
 	}()
 
@@ -90,6 +97,19 @@ func main() {
 	err = capture.Stop()
 	if err != nil {
 		fmt.Println("Error stopping audio capture:", err)
+	}
+
+	// finalize transcription
+	finalTranscription := transcriber.Finalize()
+	if finalTranscription != "" {
+		fmt.Printf("Final transcription %s\n", finalTranscription)
+	}
+
+	// save full transcription to file
+	fullTranscription := transcriber.GetFullTranscription()
+	err = os.WriteFile("transcription.txt", []byte(fullTranscription), 0644)
+	if err != nil {
+		fmt.Println("Error saving transcription to file:", err)
 	}
 
 	mu.Lock()
@@ -133,15 +153,3 @@ func updateWAVHeader(file *os.File, dataSize int) error {
 
     return nil
 }
-
-// initialize speech recognition
-	// TODO: implement speech recognition
-
-	// transcription loop
-		// capture audio
-		// process audio
-		// get transcription
-			// use goroutine to handle transcription
-		// output transcription, print to the console
-		// append each transcription chunk to a buffer
-		// when session ends, write entire buffer to a file
