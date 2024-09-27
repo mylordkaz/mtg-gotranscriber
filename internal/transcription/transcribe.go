@@ -42,11 +42,11 @@ func (t *Transcriber) ProcessAudio(data []byte) string {
 		return ""
 	case 1:
 		partialResult := t.recognizer.PartialResult()
-		text := extractText(partialResult)
+		text := extractText(string(partialResult))
 		return text
 	case 2:
 		finalResult := t.recognizer.FinalResult()
-		text := extractText(finalResult)
+		text := extractText(string(finalResult))
 		return text
 	default:
 		return ""
@@ -56,7 +56,7 @@ func (t *Transcriber) ProcessAudio(data []byte) string {
 // call after finished audio capture to ensure we got all possible transcription.
 func (t *Transcriber) Finalize() string {
 	result := t.recognizer.FinalResult()
-	text := extractText(result)
+	text := extractText(string(result))
 	t.appendToBuffer(text)
 	return text
 }
