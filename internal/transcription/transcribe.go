@@ -22,17 +22,33 @@ func NewTranscriber() (*Transcriber, error) {
     return &Transcriber{tempFile: tempFile}, nil
 }
 
+
 func (t *Transcriber) ProcessAudioChunk(chunk []byte) (string, error) {
+    fmt.Printf("Debug: Processing chunk of size %d bytes\n", len(chunk))
+
+    // Reset file for new write
+    t.tempFile.Seek(0, 0)
+    t.tempFile.Truncate(0)
+
     _, err := t.tempFile.Write(chunk)
     if err != nil {
         return "", fmt.Errorf("error writing to temp file: %v", err)
     }
 
-	scriptPath := "/Users/MyLord/goProject/mtg-gotranscriber/scripts/whisper_transcriber.py"
+    // Ensure all data is written to disk
+    t.tempFile.Sync()
+
+    fmt.Printf("Debug: Wrote %d bytes to temp file %s\n", len(chunk), t.tempFile.Name())
+
+    scriptPath := "/Users/MyLord/goProject/mtg-gotranscriber/scripts/whisper_transcriber.py"
     cmd := exec.Command("python3", scriptPath, t.tempFile.Name())
+    fmt.Printf("Debug: Executing command: %v\n", cmd.String())
+
     output, err := cmd.CombinedOutput()
+    fmt.Printf("Debug: Python script output: %s\n", string(output))
+
     if err != nil {
-		return "", fmt.Errorf("error during transcription: %v\nOutput: %s", err, string(output))
+        return "", fmt.Errorf("error during transcription: %v\nOutput: %s", err, string(output))
     }
     transcript := strings.TrimSpace(string(output))
     t.appendToBuffer(transcript)

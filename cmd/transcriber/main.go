@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
-	"github.com/mylordkaz/mtg-gotranscriber/internal/transcription"
+	
 )
 
 func main() {
@@ -22,13 +22,6 @@ func main() {
     }
 
     processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
-
-    // Initialize transcriber
-    transcriber, err := transcription.NewTranscriber()
-    if err != nil {
-        fmt.Println("Error creating transcriber:", err)
-        return
-    }
 
     err = capture.Start()
     if err != nil {
@@ -53,8 +46,6 @@ func main() {
     var mu sync.Mutex
     totalBytesWritten := 0
 
-	
-
     go func() {
         for {
             chunk, err := capture.ReadChunk(4096)
@@ -66,8 +57,6 @@ func main() {
                 fmt.Println("Error reading audio chunk:", err)
                 continue
             }
-
-			fmt.Printf("Debug: Read audio chunk of size %d bytes\n", len(chunk))
 
 			// dont want to use for now.
             processedChunk := processor.ReduceNoise(chunk)
@@ -85,15 +74,6 @@ func main() {
             totalBytesWritten += n
             mu.Unlock()
 
-            // Process the chunk for real-time transcription
-            transcript, err := transcriber.ProcessAudioChunk(chunk)
-            if err != nil {
-                fmt.Println("Error transcribing audio chunk:", err)
-                continue
-            }
-            if transcript != "" {
-                fmt.Printf("Transcription: %s\n", transcript)
-            }
         }
     }()
 
@@ -107,16 +87,10 @@ func main() {
     }
 
     // Finalize transcription
-    finalTranscription := transcriber.Finalize()
-    if finalTranscription != "" {
-        fmt.Printf("Final transcription: %s\n", finalTranscription)
-    }
+    
 
     // Save full transcription to file
-    err = os.WriteFile("transcription.txt", []byte(finalTranscription), 0644)
-    if err != nil {
-        fmt.Println("Error saving transcription to file:", err)
-    }
+   
 
     mu.Lock()
     err = updateWAVHeader(outputFile, totalBytesWritten)

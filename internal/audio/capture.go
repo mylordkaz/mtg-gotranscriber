@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"time"
 )
 
 
@@ -26,10 +27,10 @@ func NewCaptureAudio() (*AudioCapture, error) {
 	
 		cmd.Stderr = os.Stderr
 
-	stdout, err := cmd.StdoutPipe()
-    if err != nil {
+		stdout, err := cmd.StdoutPipe()
+    	if err != nil {
         return nil, fmt.Errorf("error creating StdoutPipe for FFmpeg: %v", err)
-    }
+    	}
 	
 
 	return &AudioCapture{
@@ -43,11 +44,31 @@ func (ac *AudioCapture) Start() error {
 	return ac.cmd.Start()
 }
 func (ac *AudioCapture) Stop() error {
-	return ac.cmd.Process.Kill()
+	if ac.cmd != nil && ac.cmd.Process != nil {
+        fmt.Println("Debug: Stopping ffmpeg process")
+        
+		if stdin, err := ac.cmd.StdinPipe(); err == nil {
+			stdin.Close()
+		}
+
+		done := make(chan error, 1)
+		go func() {
+			done <- ac.cmd.Wait()
+		}()
+
+		select {
+		case err := <-done:
+			return err
+		case <- time.After(5 * time.Second):
+			return ac.cmd.Process.Kill()
+		}
+    }
+    return nil
 }
 func (ac *AudioCapture) ReadChunk(bufferSize int) ([]byte, error) {
 	buffer := make([]byte, bufferSize)
     n, err := io.ReadFull(ac.reader, buffer)
+
     if err != nil {
         if err == io.EOF {
             return nil, fmt.Errorf("EOF reached, no more audio data available")
