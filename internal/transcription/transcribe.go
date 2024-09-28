@@ -1,87 +1,55 @@
 package transcription
 
 import (
-	"fmt"
-	"strings"
-	"sync"
-
-	"github.com/alphacep/vosk-api/go"
+    "fmt"
+    "os/exec"
+    "strings"
+    "sync"
+    "os"
 )
 
-
-
-
 type Transcriber struct {
-	model 		*vosk.VoskModel
-	recognizer 	*vosk.VoskRecognizer
-	buffer 		strings.Builder
-	mu 			sync.Mutex
+    buffer strings.Builder
+    mu     sync.Mutex
+    tempFile *os.File
 }
 
-func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) {
-	model, err := vosk.NewModel(modelPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create model: %v", err)
-	}
-
-	recognizer, err := vosk.NewRecognizer(model, sampleRate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create recognizer: %v", err)
-	}
-
-	return &Transcriber{
-		model: model,
-		recognizer: recognizer,
-	}, nil
+func NewTranscriber() (*Transcriber, error) {
+    tempFile, err := os.CreateTemp("", "temp_audio_*.wav")
+    if err != nil {
+        return nil, fmt.Errorf("error creating temporary file: %v", err)
+    }
+    return &Transcriber{tempFile: tempFile}, nil
 }
 
-func (t *Transcriber) ProcessAudio(data []byte) string {
-    result := t.recognizer.AcceptWaveform(data)
-	switch result {
-	case 0:
-		return ""
-	case 1:
-		partialResult := t.recognizer.PartialResult()
-		text := extractText(string(partialResult))
-		return text
-	case 2:
-		finalResult := t.recognizer.FinalResult()
-		text := extractText(string(finalResult))
-		return text
-	default:
-		return ""
-	}
+func (t *Transcriber) ProcessAudioChunk(chunk []byte) (string, error) {
+    _, err := t.tempFile.Write(chunk)
+    if err != nil {
+        return "", fmt.Errorf("error writing to temp file: %v", err)
+    }
+
+	scriptPath := "/Users/MyLord/goProject/mtg-gotranscriber/scripts/whisper_transcriber.py"
+    cmd := exec.Command("python3", scriptPath, t.tempFile.Name())
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+		return "", fmt.Errorf("error during transcription: %v\nOutput: %s", err, string(output))
+    }
+    transcript := strings.TrimSpace(string(output))
+    t.appendToBuffer(transcript)
+
+    return transcript, nil
 }
 
-// call after finished audio capture to ensure we got all possible transcription.
 func (t *Transcriber) Finalize() string {
-	result := t.recognizer.FinalResult()
-	text := extractText(string(result))
-	t.appendToBuffer(text)
-	return text
-}
-
-func (t *Transcriber) Close() {
-	t.recognizer.Free()
-	t.model.Free()
-}
-
-func (t *Transcriber) GetFullTranscription() string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.buffer.String()
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    t.tempFile.Close()
+    os.Remove(t.tempFile.Name())
+    return t.buffer.String()
 }
 
 func (t *Transcriber) appendToBuffer(text string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.buffer.WriteString(text + " ")
-}
-
-func extractText(result string) string {
-	parts := strings.Split(result, "\"text\" : \"")
-	if len(parts) < 2 {
-		return ""
-	}
-	return strings.Trim(parts[1], "\"\n}")
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    t.buffer.WriteString(text + " ")
 }
