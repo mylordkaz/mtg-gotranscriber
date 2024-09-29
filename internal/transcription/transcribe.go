@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alphacep/vosk-api/go"
+	
 )
 
 
