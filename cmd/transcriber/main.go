@@ -46,46 +46,68 @@ func main() {
     var mu sync.Mutex
     totalBytesWritten := 0
 
+    // ensure all go routines finish before exit
+    var wg sync.WaitGroup
+    wg.Add(1)
+
+    quit := make(chan struct{})
+
     go func() {
+        defer wg.Done()
         for {
-            chunk, err := capture.ReadChunk(4096)
-            if err != nil {
+            select {
+            case <- quit:
+                return
+            default:
+
+                chunk, err := capture.ReadChunk(4096)
                 if err == io.EOF {
-                    fmt.Println("End of audio stream reached")
+                    fmt.Println("EOF reached, stopping capture.")
                     return
                 }
-                fmt.Println("Error reading audio chunk:", err)
-                continue
+                if err != nil {
+                    fmt.Println("Error reading audio chunk:", err)
+                    continue
+                }
+                
+                // dont want to use for now.
+                processedChunk := processor.ReduceNoise(chunk)
+                if len(processedChunk) == 0 {
+                    fmt.Println("Processed chunk is empty, skipping")
+                    continue
+                }
+                
+                n, err := outputFile.Write(chunk)
+                if err != nil {
+                    fmt.Println("Error writing to file:", err)
+                    return
+                }
+                mu.Lock()
+                totalBytesWritten += n
+                mu.Unlock()
+                
             }
-
-			// dont want to use for now.
-            processedChunk := processor.ReduceNoise(chunk)
-            if len(processedChunk) == 0 {
-                fmt.Println("Processed chunk is empty, skipping")
-                continue
-            }
-
-            n, err := outputFile.Write(chunk)
-            if err != nil {
-                fmt.Println("Error writing to file:", err)
-                return
-            }
-            mu.Lock()
-            totalBytesWritten += n
-            mu.Unlock()
-
         }
     }()
 
     // Wait for termination signal
     <-sigChan
-
     fmt.Println("\nStopping audio capture...")
+
+    // stop audio capture
     err = capture.Stop()
     if err != nil {
         fmt.Println("Error stopping audio capture:", err)
+    } else {
+        fmt.Println("Audio capture stopped successfully")
     }
+    
+    // close done chan to signal go routine finish
+    close(quit)
 
+    // wait for the audio writing goroutine to finish
+    wg.Wait()
+    
     // Finalize transcription
     
 
