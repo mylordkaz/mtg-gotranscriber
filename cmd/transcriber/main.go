@@ -8,9 +8,10 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
-	
+	"github.com/mylordkaz/mtg-gotranscriber/internal/transcription"
 )
 
 func main() {
@@ -20,6 +21,14 @@ func main() {
         fmt.Println("Error creating audio capture:", err)
         return
     }
+
+    // initialze transcription
+    transcriber, err := transcription.NewTranscriber()
+    if err != nil {
+        fmt.Println("Error creating transcriber:", err )
+        return
+    }
+
 
     processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
 
@@ -54,6 +63,7 @@ func main() {
 
     go func() {
         defer wg.Done()
+        buffer := make([]byte, 0, 32768) // 32KB buffer
         for {
             select {
             case <- quit:
@@ -76,6 +86,18 @@ func main() {
                     fmt.Println("Processed chunk is empty, skipping")
                     continue
                 }
+
+                buffer = append(buffer, chunk...)
+                if len(buffer) >= 32768 {
+                    go func(data []byte) {
+                        transcript, err := transcriber.ProcessAudioChunk(data)
+                        if err != nil {
+                            fmt.Println("Error transcribing chunk:", err)
+                        } else if transcript != "" {
+                            fmt.Printf("Transcribed: %s\n", transcript)
+                        }
+                    }(buffer)
+                }
                 
                 n, err := outputFile.Write(chunk)
                 if err != nil {
@@ -85,6 +107,8 @@ func main() {
                 mu.Lock()
                 totalBytesWritten += n
                 mu.Unlock()
+
+                buffer = buffer[:0]
                 
             }
         }
@@ -94,25 +118,38 @@ func main() {
     <-sigChan
     fmt.Println("\nStopping audio capture...")
 
-    // stop audio capture
-    err = capture.Stop()
-    if err != nil {
-        fmt.Println("Error stopping audio capture:", err)
-    } else {
-        fmt.Println("Audio capture stopped successfully")
-    }
-    
     // close done chan to signal go routine finish
     close(quit)
+
+    // stop audio capture
+    stopChan := make(chan struct{})
+    go func() {
+        err := capture.Stop()
+        if err != nil {
+            fmt.Println("Error stopping audio capture:", err)
+        }
+        close(stopChan)
+    }()
+
+    select {
+    case <-stopChan:
+        fmt.Println("Audio capture stopped successfully")
+    case <-time.After(10 * time.Second):
+        fmt.Println("Timeout while stopping audio capture, forcing shutdown")
+    }
 
     // wait for the audio writing goroutine to finish
     wg.Wait()
     
     // Finalize transcription
-    
+    finalTranscript := transcriber.Finalize()
+    fmt.Println("final transcript:", finalTranscript)
 
     // Save full transcription to file
-   
+   err = os.WriteFile("transcript.txt", []byte(finalTranscript), 0644)
+   if err != nil {
+    fmt.Println("Error saving transcription:", err)
+   }
 
     mu.Lock()
     err = updateWAVHeader(outputFile, totalBytesWritten)
