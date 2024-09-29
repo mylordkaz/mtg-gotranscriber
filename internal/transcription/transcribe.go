@@ -1,11 +1,12 @@
 package transcription
 
 import (
-    "fmt"
-    "os/exec"
-    "strings"
-    "sync"
-    "os"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"syscall"
 )
 
 type Transcriber struct {
@@ -42,12 +43,15 @@ func (t *Transcriber) ProcessAudioChunk(chunk []byte) (string, error) {
 
     scriptPath := "/Users/MyLord/goProject/mtg-gotranscriber/scripts/whisper_transcriber.py"
     cmd := exec.Command("python3", scriptPath, t.tempFile.Name())
-    fmt.Printf("Debug: Executing command: %v\n", cmd.String())
+    cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
     output, err := cmd.CombinedOutput()
-    fmt.Printf("Debug: Python script output: %s\n", string(output))
-
     if err != nil {
+        if exitError, ok := err.(*exec.ExitError); ok {
+            if exitError.ExitCode() == -1 { // interrupted
+                return "", fmt.Errorf("transcription interrupted")
+            }
+        }
         return "", fmt.Errorf("error during transcription: %v\nOutput: %s", err, string(output))
     }
     transcript := strings.TrimSpace(string(output))
