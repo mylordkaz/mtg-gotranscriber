@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
+
 	"sync"
 	"syscall"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
-	"github.com/mylordkaz/mtg-gotranscriber/internal/transcription"
+	
 )
 
 func main() {
@@ -24,14 +24,6 @@ func main() {
 
 	processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
 
-	modelPath := filepath.Join("internal", "transcription", "models", "ja-model")
-	// initialize transcriber
-	transcriber, err := transcription.NewTranscriber(modelPath, 44100)
-	if err != nil {
-		fmt.Println("Error creating transcriber:", err)
-		return
-	}
-	defer transcriber.Close()
 
 	err = capture.Start()
 	if err != nil {
@@ -69,8 +61,7 @@ func main() {
 
 			// Noise reduction is not in use right now.
 			processedChunk := processor.ReduceNoise(chunk)
-
-			if len(processedChunk) == 0 {
+            if len(processedChunk) == 0 {
 				fmt.Println("Processed chunk is empty, skipping")
 				continue
 			}
@@ -82,36 +73,17 @@ func main() {
         	}
 			mu.Lock()
 			totalBytesWritten += n
-			mu.Unlock()
-			
-			// process audio for transcription
-			transcript := transcriber.ProcessAudio(chunk)
-			if transcript != "" {
-				fmt.Printf("Transcription: %s\n", transcript)
-			}
+			mu.Unlock()	
 		}
 	}()
 
 	// wait for termination signal
 	<-sigChan
 
-	fmt.Println("\nStopping audio capture...")
+	fmt.Println("\nAudio capture finish...")
 	err = capture.Stop()
 	if err != nil {
 		fmt.Println("Error stopping audio capture:", err)
-	}
-
-	// finalize transcription
-	finalTranscription := transcriber.Finalize()
-	if finalTranscription != "" {
-		fmt.Printf("Final transcription %s\n", finalTranscription)
-	}
-
-	// save full transcription to file
-	fullTranscription := transcriber.GetFullTranscription()
-	err = os.WriteFile("transcription.txt", []byte(fullTranscription), 0644)
-	if err != nil {
-		fmt.Println("Error saving transcription to file:", err)
 	}
 
 	mu.Lock()
