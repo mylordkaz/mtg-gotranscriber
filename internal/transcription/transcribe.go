@@ -3,23 +3,17 @@ package transcription
 import (
 	"fmt"
 	"strings"
-	"sync"
-
-	
 )
 
 
 
 
 type Transcriber struct {
-	model 		*vosk.VoskModel
-	recognizer 	*vosk.VoskRecognizer
-	buffer 		strings.Builder
-	mu 			sync.Mutex
+	
 }
 
 func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) {
-	model, err := vosk.NewModel(modelPath)
+	model, err := 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model: %v", err)
 	}
