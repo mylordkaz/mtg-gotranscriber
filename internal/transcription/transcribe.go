@@ -1,6 +1,7 @@
 package transcription
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -35,24 +36,28 @@ func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) 
 	}, nil
 }
 
-func (t *Transcriber) ProcessAudio(data []byte) string {
+func (t *Transcriber) ProcessAudio(data []byte) (string, error) {
     result := t.recognizer.AcceptWaveform(data)
 	switch result {
 	case 0:
-		return ""
+		return "", nil
 	case 1:
 		partialResult := t.recognizer.PartialResult()
 		text := extractText(string(partialResult))
-		return text
+		return text, nil
 	case 2:
 		finalResult := t.recognizer.FinalResult()
 		text := extractText(string(finalResult))
-		return text
+		return text, nil
 	default:
-		return ""
+		return "", fmt.Errorf("unexpected result from AcceptWaveform: %d", result)
 	}
 }
-
+func (t *Transcriber) ResetBuffer() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buffer.Reset()
+}
 // call after finished audio capture to ensure we got all possible transcription.
 func (t *Transcriber) Finalize() string {
 	result := t.recognizer.FinalResult()
@@ -79,9 +84,11 @@ func (t *Transcriber) appendToBuffer(text string) {
 }
 
 func extractText(result string) string {
-	parts := strings.Split(result, "\"text\" : \"")
-	if len(parts) < 2 {
+	var data struct {
+		Text string `json:text`
+	}
+	if err := json.Unmarshal([]byte(result), &data); err != nil {
 		return ""
 	}
-	return strings.Trim(parts[1], "\"\n}")
+	return data.Text
 }
