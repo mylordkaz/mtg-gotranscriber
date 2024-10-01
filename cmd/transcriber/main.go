@@ -56,12 +56,13 @@ func main() {
 
 	writeWAVHeader(outputFile, 44100, 2, 16)
 
+    done := make(chan struct{})
     var wg sync.WaitGroup
 	var mu sync.Mutex
 	totalBytesWritten := 0
 
     wg.Add(1)
-	go processAudio(&wg, capture, processor, transcriber, outputFile, &mu, &totalBytesWritten)
+	go processAudio(&wg, capture, processor, transcriber, outputFile, &mu, &totalBytesWritten, done)
 
     // Wait for termination signal
     <-sigChan
@@ -70,6 +71,8 @@ func main() {
     if err := capture.Stop(); err != nil {
         log.Printf("Error stopping audio capture: %v", err)
     }
+
+    close(done)
 
     // Wait for audio processing to complete
     wg.Wait()
@@ -85,49 +88,54 @@ func main() {
     mu.Unlock()
 }
 
-func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *audio.AudioProcessor, transcriber *transcription.Transcriber, outputFile *os.File, mu *sync.Mutex, totalBytesWritten *int) {
+func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *audio.AudioProcessor, transcriber *transcription.Transcriber, outputFile *os.File, mu *sync.Mutex, totalBytesWritten *int, done chan struct{}) {
     defer wg.Done()
 
     for {
-        chunk, err := capture.ReadChunk(4096)
-        if err != nil {
-            if err == io.EOF {
-                fmt.Println("End of audio stream reached")
+        select {
+        case <-done:
+            return
+        default:
+            chunk, err := capture.ReadChunk(4096)
+            if err != nil {
+                if err == io.EOF {
+                    log.Println("End of audio stream reached")
+                    return
+                }
+                log.Printf("Error reading audio chunk: %v", err)
+                continue
+            }
+
+            // Process audio chunk (noise reduction currently not in use)
+            processedChunk := processor.ReduceNoise(chunk)
+
+            if len(processedChunk) == 0 {
+                continue
+            }
+
+            // Write processed audio to file
+            n, err := outputFile.Write(chunk)
+            if err != nil {
+                log.Printf("Error writing to file: %v", err)
                 return
             }
-            log.Printf("Error reading audio chunk: %v", err)
-            continue
-        }
 
-        // Process audio chunk (noise reduction currently not in use)
-        processedChunk := processor.ReduceNoise(chunk)
+            mu.Lock()
+            *totalBytesWritten += n
+            mu.Unlock()
 
-        if len(processedChunk) == 0 {
-            log.Println("Processed chunk is empty, skipping")
-            continue
-        }
-
-        // Write processed audio to file
-        n, err := outputFile.Write(processedChunk)
-        if err != nil {
-            log.Printf("Error writing to file: %v", err)
-            return
-        }
-
-        mu.Lock()
-        *totalBytesWritten += n
-        mu.Unlock()
-
-        // Process audio for transcription
-        transcript, err := transcriber.ProcessAudio(processedChunk)
-        if err != nil {
-            log.Printf("Error processing audio for transcription: %v", err)
-            continue
-        }
-        if transcript != "" {
-            fmt.Printf("Transcription: %s\n", transcript)
+            // Process audio for transcription
+            transcript, err := transcriber.ProcessAudio(processedChunk)
+            if err != nil {
+                log.Printf("Error processing audio for transcription: %v", err)
+                continue
+            }
+            if transcript != "" {
+                fmt.Printf("Transcription: %s\n", transcript)
+            }
         }
     }
+
 }
 
 func finalizeTranscription(transcriber *transcription.Transcriber) {
