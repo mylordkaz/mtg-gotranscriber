@@ -16,6 +16,7 @@ import (
 )
 
 func main() {
+    os.Stdout = os.NewFile(uintptr(syscall.Stdout), "/dev/stdout")
 	// initialize audio capture
 	capture, err := audio.NewCaptureAudio()
 	if err != nil {
@@ -132,6 +133,7 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
             }
             if transcript != "" {
                 fmt.Printf("Transcription: %s\n", transcript)
+                os.Stdout.Sync() // force flush
             }
         }
     }
