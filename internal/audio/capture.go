@@ -19,8 +19,8 @@ func NewCaptureAudio() (*AudioCapture, error) {
         "-f", "avfoundation",
         "-i", ":0",
         "-acodec", "pcm_s16le",
-        "-ar", "44100",
-        "-ac", "2",
+        "-ar", "16000", // output sample rate to 16kHz
+        "-ac", "1",  // set to mono
         "-f", "s16le",
         "-")
 	
