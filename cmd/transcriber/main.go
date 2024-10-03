@@ -24,11 +24,11 @@ func main() {
 		return
 	}
 
-	processor := audio.NewAudioProcessor(44100, 2) // 44.1khz stereo audio
+	processor := audio.NewAudioProcessor(16000, 1) // 16kHz mono
 
 	// initialize transcriber
-	modelPath := filepath.Join("internal", "transcription", "models", "ja-model")
-	transcriber, err := transcription.NewTranscriber(modelPath, 44100)
+	modelPath := filepath.Join("internal", "transcription", "models", "small-ja-model")
+	transcriber, err := transcription.NewTranscriber(modelPath, 16000)
 	if err != nil {
 		fmt.Println("Error creating transcriber:", err)
 		return
@@ -55,7 +55,7 @@ func main() {
 	}
 	defer outputFile.Close()
 
-	writeWAVHeader(outputFile, 44100, 2, 16)
+	writeWAVHeader(outputFile, 16000, 1, 16)
 
     done := make(chan struct{})
     var wg sync.WaitGroup
@@ -97,7 +97,7 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
         case <-done:
             return
         default:
-            chunk, err := capture.ReadChunk(4096)
+            chunk, err := capture.ReadChunk(1024)
             if err != nil {
                 if err == io.EOF {
                     log.Println("End of audio stream reached")
@@ -109,7 +109,6 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
 
             // Process audio chunk (noise reduction currently not in use)
             processedChunk := processor.ReduceNoise(chunk)
-
             if len(processedChunk) == 0 {
                 continue
             }
@@ -126,7 +125,7 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
             mu.Unlock()
 
             // Process audio for transcription
-            transcript, err := transcriber.ProcessAudio(processedChunk)
+            transcript, err := transcriber.ProcessAudio(chunk)
             if err != nil {
                 log.Printf("Error processing audio for transcription: %v", err)
                 continue
