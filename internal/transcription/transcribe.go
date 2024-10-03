@@ -3,6 +3,7 @@ package transcription
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -30,6 +31,9 @@ func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) 
 		return nil, fmt.Errorf("failed to create recognizer: %v", err)
 	}
 
+	recognizer.SetMaxAlternatives(0)
+    recognizer.SetWords(1)
+
 	return &Transcriber{
 		model: model,
 		recognizer: recognizer,
@@ -38,17 +42,22 @@ func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) 
 
 func (t *Transcriber) ProcessAudio(data []byte) (string, error) {
     result := t.recognizer.AcceptWaveform(data)
+	log.Printf("AcceptWaveform result: %d", result)
 	switch result {
 	case 0:
-		return "", nil
-	case 1:
 		partialResult := t.recognizer.PartialResult()
 		text := extractText(string(partialResult))
 		return text, nil
+	case 1:
+		finalResult := t.recognizer.Result()
+        text := extractText(string(finalResult))
+        t.appendToBuffer(text)
+        return text, nil
 	case 2:
 		finalResult := t.recognizer.FinalResult()
-		text := extractText(string(finalResult))
-		return text, nil
+        text := extractText(string(finalResult))
+        t.appendToBuffer(text)
+        return text, nil
 	default:
 		return "", fmt.Errorf("unexpected result from AcceptWaveform: %d", result)
 	}
