@@ -3,7 +3,6 @@ package transcription
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -42,7 +41,6 @@ func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) 
 
 func (t *Transcriber) ProcessAudio(data []byte) (string, error) {
     result := t.recognizer.AcceptWaveform(data)
-	log.Printf("AcceptWaveform result: %d", result)
 	switch result {
 	case 0:
 		partialResult := t.recognizer.PartialResult()
