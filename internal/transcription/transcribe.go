@@ -13,15 +13,7 @@ type Transcriber struct {
 }
 
 func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) {
-	model, err := 
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create model: %v", err)
-	// }
-
-	recognizer, err := 
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create recognizer: %v", err)
-	// }
+	
 
 	return &Transcriber{
 		model: model,
