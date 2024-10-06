@@ -4,17 +4,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
+
+	"github.com/alphacep/vosk-api/go"
 )
 
 
 
 
 type Transcriber struct {
-	
+	model 		*vosk.VoskModel
+	recognizer 	*vosk.VoskRecognizer
+	buffer 		strings.Builder
+	mu 			sync.Mutex
 }
 
 func NewTranscriber(modelPath string, sampleRate float64) (*Transcriber, error) {
-	
+	model, err := vosk.NewModel(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create model: %v", err)
+	}
+
+	recognizer, err := vosk.NewRecognizer(model, sampleRate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create recognizer: %v", err)
+	}
 
 	recognizer.SetMaxAlternatives(0)
     recognizer.SetWords(1)
