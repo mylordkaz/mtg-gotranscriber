@@ -7,12 +7,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
+
 	"sync"
 	"syscall"
 
 	"github.com/mylordkaz/mtg-gotranscriber/internal/audio"
-	"github.com/mylordkaz/mtg-gotranscriber/internal/transcription"
+	
 )
 
 func main() {
