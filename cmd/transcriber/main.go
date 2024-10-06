@@ -27,7 +27,7 @@ func main() {
 	processor := audio.NewAudioProcessor(16000, 1) // 16kHz mono
 
 	// initialize transcriber
-	modelPath := filepath.Join("internal", "transcription", "models", "small-ja-model")
+	modelPath := filepath.Join("internal", "transcription", "models", "ja-model")
 	transcriber, err := transcription.NewTranscriber(modelPath, 16000)
 	if err != nil {
 		fmt.Println("Error creating transcriber:", err)
@@ -97,7 +97,7 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
         case <-done:
             return
         default:
-            chunk, err := capture.ReadChunk(1024)
+            chunk, err := capture.ReadChunk(512)
             if err != nil {
                 if err == io.EOF {
                     log.Println("End of audio stream reached")
