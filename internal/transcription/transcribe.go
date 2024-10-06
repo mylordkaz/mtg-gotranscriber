@@ -9,9 +9,6 @@ import (
 	"github.com/alphacep/vosk-api/go"
 )
 
-
-
-
 type Transcriber struct {
 	model 		*vosk.VoskModel
 	recognizer 	*vosk.VoskRecognizer
