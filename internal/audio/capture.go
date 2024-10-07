@@ -15,6 +15,11 @@ type AudioCapture struct {
 	reader *bufio.Reader
 }
 func NewCaptureAudio() (*AudioCapture, error) {
+	logFile, err := os.Create("ffmpeg.log")
+    if err != nil {
+        return nil, fmt.Errorf("failed to create log file: %v", err)
+    }
+
 	cmd := exec.Command("ffmpeg",
         "-f", "avfoundation",
         "-i", ":BlackHole 2ch",
@@ -25,7 +30,7 @@ func NewCaptureAudio() (*AudioCapture, error) {
 		"-af", "dynaudnorm=f=200:g=3:p=0.91,highpass=f=80,lowpass=f=7500",
         "-")
 	
-		cmd.Stderr = os.Stderr
+		cmd.Stderr = logFile
 
 	stdout, err := cmd.StdoutPipe()
     if err != nil {
@@ -48,15 +53,12 @@ func (ac *AudioCapture) Stop() error {
 }
 func (ac *AudioCapture) ReadChunk(bufferSize int) ([]byte, error) {
 	buffer := make([]byte, bufferSize)
-    n, err := io.ReadFull(ac.reader, buffer)
+    n, err := io.ReadAtLeast(ac.reader, buffer, bufferSize)
     if err != nil {
         if err == io.EOF {
             return nil, fmt.Errorf("EOF reached, no more audio data available")
         }
-        if err == io.ErrUnexpectedEOF {
-            return buffer[:n], nil  // Return partial buffer
-        }
-        return nil, fmt.Errorf("error reading audio data: %v", err)
+        return buffer[:n], err  // Return partial buffer with error
     }
-    return buffer, nil
+    return buffer[:n], nil
 }
