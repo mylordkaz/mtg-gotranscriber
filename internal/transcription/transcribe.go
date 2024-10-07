@@ -89,7 +89,7 @@ func (t *Transcriber) appendToBuffer(text string) {
 
 func extractText(result string) string {
 	var data struct {
-		Text string `json:text`
+		Text string `json:"text"`
 	}
 	if err := json.Unmarshal([]byte(result), &data); err != nil {
 		return ""
