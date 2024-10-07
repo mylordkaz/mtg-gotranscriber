@@ -3,3 +3,5 @@
 models
 output.wav
 transcription.txt
+transcriber
+!transcriber/
