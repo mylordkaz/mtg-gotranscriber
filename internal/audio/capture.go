@@ -22,6 +22,7 @@ func NewCaptureAudio() (*AudioCapture, error) {
         "-ar", "16000", // output sample rate to 16kHz
         "-ac", "1",  // set to mono
         "-f", "s16le",
+		"-af", "dynaudnorm=f=200:g=3:p=0.91,highpass=f=80,lowpass=f=7500",
         "-")
 	
 		cmd.Stderr = os.Stderr
