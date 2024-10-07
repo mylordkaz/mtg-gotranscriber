@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 
 	"sync"
 	"syscall"
@@ -28,7 +29,7 @@ func main() {
 	processor := audio.NewAudioProcessor(16000, 1) // 16kHz mono
 
 	// initialize transcriber
-	modelPath := filepath.Join("internal", "transcription", "models", "ja-model")
+	modelPath := filepath.Join("internal", "transcription", "models", "small-en-model")
 	transcriber, err := transcription.NewTranscriber(modelPath, 16000)
 	if err != nil {
 		fmt.Println("Error creating transcriber:", err)
@@ -80,7 +81,7 @@ func main() {
     wg.Wait()
 
     // Finalize transcription and save to file
-    finalizeTranscription(transcriber)
+    // finalizeTranscription(transcriber)
 
     // Update WAV header
     mu.Lock()
@@ -98,19 +99,13 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
         case <-done:
             return
         default:
-            chunk, err := capture.ReadChunk(160)
+            chunk, err := capture.ReadChunk(1600) // 100ms of audio at 16kHz, 16-bit
             if err != nil {
                 if err == io.EOF {
                     log.Println("End of audio stream reached")
                     return
                 }
                 log.Printf("Error reading audio chunk: %v", err)
-                continue
-            }
-
-            // Process audio chunk (noise reduction currently not in use)
-            processedChunk := processor.ReduceNoise(chunk)
-            if len(processedChunk) == 0 {
                 continue
             }
 
@@ -125,19 +120,19 @@ func processAudio(wg *sync.WaitGroup, capture *audio.AudioCapture, processor *au
             *totalBytesWritten += n
             mu.Unlock()
 
+            
             // Process audio for transcription
-            transcript, err := transcriber.ProcessAudio(chunk)
+            newWords, err := transcriber.ProcessAudio(chunk)
             if err != nil {
                 log.Printf("Error processing audio for transcription: %v", err)
-                continue
-            }
-            if transcript != "" {
-                fmt.Printf("Transcription: %s\n", transcript)
+            } else if len(newWords) > 0 {
+                mu.Lock()
+                fmt.Print(strings.Join(newWords, " ") + " ")
                 os.Stdout.Sync() // force flush
+                mu.Unlock()
             }
         }
     }
-
 }
 
 func finalizeTranscription(transcriber *transcription.Transcriber) {
