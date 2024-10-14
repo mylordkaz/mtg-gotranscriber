@@ -1,3 +1,7 @@
-cmd/transcriber/transcriber
+
 .DS_Store
 models
+output.wav
+transcription.txt
+transcriber
+!transcriber/
