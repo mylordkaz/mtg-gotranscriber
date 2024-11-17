@@ -2,26 +2,23 @@ package audio
 
 import "math"
 
-
-
 type AudioProcessor struct {
-	noiseThreshold 	float64
-	attenuation		float64
-	sampleRate 		int
-	numChannels 	int
+	noiseThreshold float64
+	attenuation    float64
+	sampleRate     int
+	numChannels    int
 }
 
 func NewAudioProcessor(sampleRate, numChannels int) *AudioProcessor {
 	return &AudioProcessor{
 		noiseThreshold: 0.05, // moderate threshold
-		attenuation: 0.5, // reduce noise by 50%
-		sampleRate: sampleRate,
-		numChannels: numChannels,
+		attenuation:    0.5,  // reduce noise by 50%
+		sampleRate:     sampleRate,
+		numChannels:    numChannels,
 	}
 }
 
 func (ap *AudioProcessor) ReduceNoise(input []byte) []byte {
-	
 	output := make([]byte, len(input))
 	samplesPerChannel := len(input) / (2 * ap.numChannels) // 16-bit samples
 
@@ -45,28 +42,28 @@ func (ap *AudioProcessor) ReduceNoise(input []byte) []byte {
 }
 
 func (ap *AudioProcessor) SplitChannels(input []byte) ([]byte, []byte) {
-    inputLength := len(input)
-    leftLength := inputLength / 2
-    if inputLength % 2 != 0 {
-        leftLength = (inputLength + 1) / 2
-    }
-    leftChannel := make([]byte, leftLength)
-    rightChannel := make([]byte, inputLength - leftLength)
+	inputLength := len(input)
+	leftLength := inputLength / 2
+	if inputLength%2 != 0 {
+		leftLength = (inputLength + 1) / 2
+	}
+	leftChannel := make([]byte, leftLength)
+	rightChannel := make([]byte, inputLength-leftLength)
 
-    for i := 0; i < inputLength-1; i += 2 {
-        leftChannel[i/2] = input[i]
-        rightChannel[i/2] = input[i+1]
-    }
+	for i := 0; i < inputLength-1; i += 2 {
+		leftChannel[i/2] = input[i]
+		rightChannel[i/2] = input[i+1]
+	}
 
-    // Handle the last byte if input length is odd
-    if inputLength % 2 != 0 {
-        leftChannel[leftLength-1] = input[inputLength-1]
-    }
+	// Handle the last byte if input length is odd
+	if inputLength%2 != 0 {
+		leftChannel[leftLength-1] = input[inputLength-1]
+	}
 
-    return leftChannel, rightChannel
+	return leftChannel, rightChannel
 }
 
-// not used at the moment 
+// not used at the moment
 func (ap *AudioProcessor) LowPassFilter(input []byte) []byte {
 	output := make([]byte, len(input))
 	samplesPerChannel := len(input) / (2 * ap.numChannels)
@@ -91,3 +88,4 @@ func (ap *AudioProcessor) LowPassFilter(input []byte) []byte {
 	}
 	return output
 }
+
