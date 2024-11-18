@@ -29,7 +29,7 @@ func main() {
 	processor := audio.NewAudioProcessor(16000, 1) // 16kHz mono
 
 	// initialize transcriber
-	modelPath := filepath.Join("internal", "transcription", "models", "small-en-model")
+	modelPath := filepath.Join("internal", "transcription", "models", "small-ja-model")
 	transcriber, err := transcription.NewTranscriber(modelPath, 16000)
 	if err != nil {
 		fmt.Println("Error creating transcriber:", err)
