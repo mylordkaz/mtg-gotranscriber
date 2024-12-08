@@ -1,7 +1,30 @@
-
-.DS_Store
-models
-output.wav
-transcription.txt
+# Binary files
+main
 transcriber
-!transcriber/
+
+# Dynamic libraries
+*.dylib
+
+# Audio files (if you plan to have test audio files)
+*.mp3
+*.wav
+*.m4a
+
+# macOS system files
+.DS_Store
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.out
+
+# IDE specific (for VS Code)
+.vscode/
+
+# model files
+models
+
+#log
+*.log
